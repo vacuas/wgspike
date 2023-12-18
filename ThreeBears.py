@@ -289,6 +289,12 @@ class Bear(object):
         self.NAME = name \
             or 'ThreeBears_{}_{}'.format(d, round(self.VARIANCE * 128))
 
+        self.details = {
+            'length_public_key': self.PUBLIC_KEY_BYTES,
+            'length_ciphertext': self.CIPHERTEXT_KEY_BYTES,
+        }
+        self.sk = None
+
         Bear._all.append(self)
 
     def keygen(self, sk=urandom(40)):
@@ -301,6 +307,19 @@ class Bear(object):
 
     def decode(self, sk, ct):
         return self.decapsulate(sk, ct, implicit=True)
+
+    # oqs api
+    def generate_keypair(self, sk=urandom(40)):
+        self.sk = sk
+        pk = self.keypair(sk)
+        return pk
+
+    def encap_secret(self, pk, seed=urandom(32)):
+        shared, ct = self.encapsulate(pk, seed)
+        return ct, shared
+
+    def decap_secret(self, ct):
+        return self.decapsulate(self.sk, ct, implicit=True)
 
 
 BabyBearEphem = Bear(name="BabyBearEphem", d=2, variance=32.0/32, cca=False)

@@ -3,6 +3,7 @@
 import base64
 from cryptography.hazmat.primitives.asymmetric import x448
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.ciphers.aead import AESSIV
 import hashlib
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import logging
@@ -11,8 +12,10 @@ import os
 import requests
 import subprocess
 import sys
+import traceback
 import yaml
 import time
+import ThreeBears
 
 loglevel = logging.DEBUG
 
@@ -29,10 +32,14 @@ app_timestamp = 0
 time_leeway = 60
 ephem_alg = 'Kyber1024'
 sigalg = 'SPHINCS+-SHAKE-128f-simple'
+nonce_length = 12
 
-pqephem = oqs.KeyEncapsulation(ephem_alg)
-length_public_key = pqephem.details['length_public_key']
-length_ciphertext = pqephem.details['length_ciphertext']
+ephem_kem = oqs.KeyEncapsulation(ephem_alg)
+ephem_kem = ThreeBears.GrizzlyBear
+ephem_kem = ThreeBears.Bear(d=6, variance=16.0 / 32, cca=False)
+
+length_public_key = ephem_kem.details['length_public_key']
+length_ciphertext = ephem_kem.details['length_ciphertext']
 
 pqsig = oqs.Signature(sigalg)
 length_signature = pqsig.details['length_signature']
@@ -41,7 +48,7 @@ x488_start = 8
 x488_length = 56
 x448_end = x488_start + x488_length
 pq_end = x448_end + length_public_key
-resp_end = x488_length + length_public_key
+resp_end = x488_length + length_ciphertext
 
 
 class HashalotException(Exception):
@@ -72,6 +79,9 @@ class PqKexServer(BaseHTTPRequestHandler):
             start_time = time.time()
             content_length = int(self.headers['Content-Length'])
             postdata = self.rfile.read(content_length)
+            nonce = postdata[:nonce_length]
+            postdata = local_aead.decrypt(postdata[nonce_length:],
+                                          [b'', nonce])
 
             timestamp = int.from_bytes(postdata[:8], byteorder='big')
             if app_timestamp > timestamp or abs(time.time() - timestamp) > time_leeway:
@@ -112,7 +122,7 @@ class PqKexServer(BaseHTTPRequestHandler):
 
     def handle_data(self, xephem_pub, pqephem_pub):
 
-        #rxephem_key = x448.X448PrivateKey.generate()
+        # rxephem_key = x448.X448PrivateKey.generate()
         rxephem_key = x448.X448PrivateKey.from_private_bytes(os.urandom(56))
         rxephem_pub = rxephem_key.public_key().public_bytes(
             encoding=serialization.Encoding.Raw,
@@ -121,12 +131,13 @@ class PqKexServer(BaseHTTPRequestHandler):
         xephem_key = x448.X448PublicKey.from_public_bytes(xephem_pub)
         xephem_secret = rxephem_key.exchange(xephem_key)
 
-        ephem_kem = oqs.KeyEncapsulation(ephem_alg)
         ephem_ct, ephem_secret = ephem_kem.encap_secret(pqephem_pub)
 
         respdata = rxephem_pub + ephem_ct
         signature = localsig.sign(respdata)
-        respdata = respdata + signature
+        nonce = os.urandom(nonce_length)
+        respdata = nonce + \
+            local_aead.encrypt(respdata + signature, [b'', nonce])
 
         # Compose WG pre-shared secret
         wghash = hashlib.sha3_256(
@@ -154,8 +165,6 @@ def kex_request():
     timestamp = time.time()
 
     # Create crypto
-
-    ephem_kem = oqs.KeyEncapsulation(ephem_alg)
     ephem_pq = ephem_kem.generate_keypair()
 
     # xephem_key = x448.X448PrivateKey.generate()
@@ -168,7 +177,8 @@ def kex_request():
     # Signature
     reqdata = int(timestamp).to_bytes(8, 'big') + xephem_pub + ephem_pq
     signature = localsig.sign(reqdata)
-    reqdata = reqdata + signature
+    nonce = os.urandom(nonce_length)
+    reqdata = nonce + remote_aead.encrypt(reqdata + signature,  [b'', nonce])
 
     headers = {
         'Content-Type': 'application/octet-stream',
@@ -197,6 +207,8 @@ def kex_request():
                  len(reqdata), len(response.content))
 
     respdata = response.content
+    nonce = respdata[:nonce_length]
+    respdata = remote_aead.decrypt(respdata[nonce_length:], [b'', nonce])
 
     signature = respdata[resp_end:]
     if not remotesig.verify(respdata[:resp_end],
@@ -252,12 +264,16 @@ try:
 
     yamldata = yaml.safe_load(open(sys.argv[1]))
     iface = yamldata['Iface']
-    remote_id = yamldata['RemoteWgId']
+    local_id = yamldata['WireguardId']
+    remote_id = yamldata['RemoteWireguardId']
 
     local_sigkey = base64.b64decode(yamldata['SecretKey'])
     localsig = oqs.Signature(sigalg, local_sigkey)
     remote_sigkey = base64.b64decode(yamldata['RemotePublicKey'])
     remotesig = oqs.Signature(sigalg)
+
+    local_aead = AESSIV(base64.b64decode(local_id + '=='))
+    remote_aead = AESSIV(base64.b64decode(remote_id + '=='))
 
     serverPort = yamldata.get('Port')
     remoteurl = yamldata.get('RemoteURL')
@@ -282,3 +298,4 @@ try:
 except Exception as exc:
     logger.error('Exception: {}'.format(exc.__class__.__name__))
     logger.error(exc)
+    logger.debug(traceback.format_exc())
