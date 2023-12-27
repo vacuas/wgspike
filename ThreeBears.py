@@ -328,7 +328,9 @@ MamaBearEphem = Bear(name="MamaBearEphem", d=3, variance=28.0/32, cca=False)
 MamaBear = Bear(name="MamaBear", d=3, variance=13.0/32)
 PapaBearEphem = Bear(name="PapaBearEphem", d=4,  variance=24.0/32, cca=False)
 PapaBear = Bear(name="PapaBear", d=4, variance=10.0/32)
+GrizzlyBearEphem = Bear(name="GrizzlyBearEphem", d=6, variance=0.625, cca=False)
 GrizzlyBear = Bear(name="GrizzlyBear", d=6, variance=8.0 / 32)
+PolarBearEphem = Bear(name="PolarBearEphem", d=8, variance=0.5, cca=False)
 PolarBear = Bear(name="PolarBear", d=8, variance=7.0/32)
 
 

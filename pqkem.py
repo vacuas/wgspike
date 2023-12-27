@@ -138,19 +138,22 @@ class PqKexServer(BaseHTTPRequestHandler):
             b'wgpsk' + ephem_secret + xephem_secret).digest()
         wghash = base64.b64encode(wghash).decode()
 
-        temp_pskfile = '/tmp/wgtemps'
-        with open(temp_pskfile, 'w') as wfile:
-            wfile.write(wghash)
+        try:
+            temp_pskfile = '/tmp/wgtemps'
+            with open(temp_pskfile, 'w') as wfile:
+                wfile.write(wghash)
 
-        result = subprocess.run(['wg', 'set', iface, 'peer', remote_id, 'preshared-key', temp_pskfile],
-                                capture_output=True, text=True)
-        os.remove(temp_pskfile)
+            result = subprocess.run(['wg', 'set', iface, 'peer', remote_id, 'preshared-key', temp_pskfile],
+                                    capture_output=True, text=True)
+            os.remove(temp_pskfile)
 
-        if result.returncode:
-            logger.debug(result)
+            if result.returncode:
+                logger.debug(result)
+                logger.info('WG hash: ' + wghash)
+            else:
+                logger.info('PSK updated for ' + iface)
+        except:
             logger.info('WG hash: ' + wghash)
-        else:
-            logger.info('PSK updated for ' + iface)
 
         return 200, respdata
 

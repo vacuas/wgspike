@@ -20,7 +20,7 @@ import PqKex
 
 
 # pqkem = PqKex.PythonKyber()
-pqkem = PqKex.KexBear(name="GrizzlyBearEphem", d=6, variance=16.0/32, cca=False)
+pqkem = PqKex.Bear(name="GrizzlyBearEphem", d=6, variance=16.0/32, cca=False)
 # pqkem = PqKex.OqsKem('Kyber1024')
 # pqkem = PqKex.OqsKem('FrodoKEM-1344-SHAKE')
 

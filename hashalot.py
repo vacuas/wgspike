@@ -16,6 +16,7 @@ import traceback
 import yaml
 import time
 import ThreeBears
+import KyberKem
 
 loglevel = logging.DEBUG
 
@@ -35,8 +36,8 @@ sigalg = 'SPHINCS+-SHAKE-128f-simple'
 nonce_length = 12
 
 ephem_kem = oqs.KeyEncapsulation(ephem_alg)
-ephem_kem = ThreeBears.GrizzlyBear
-ephem_kem = ThreeBears.Bear(d=6, variance=16.0 / 32, cca=False)
+ephem_kem = ThreeBears.GrizzlyBearEphem
+ephem_kem = KyberKem
 
 length_public_key = ephem_kem.details['length_public_key']
 length_ciphertext = ephem_kem.details['length_ciphertext']

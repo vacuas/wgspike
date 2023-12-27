@@ -7,9 +7,9 @@ import kyber_ietf
 import oqs
 
 
-class KexBear(ThreeBears_nist.Bear):
+class Bear(ThreeBears_nist.Bear):
     def __init__(self, name, variance, d, cca):
-        super(KexBear, self).__init__(name, variance, d, cca, useFec=True)
+        super(Bear, self).__init__(name, variance, d, cca, useFec=True)
         self.PUBLIC_KEY_BYTES = 24 + d * 390
         self.PRIVATE_KEY_BYTES = 40
         self.CIPHERTEXT_KEY_BYTES = 137 + d * 390
